@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Weekly Availability Picker</title>
+<style>
+    body { font-family: Arial; }
+    table { border-collapse: collapse; }
+    td, th {
+        border: 1px solid #ccc;
+        padding: 4px;
+        text-align: center;
+        font-size: 11px;
+        cursor: pointer;
+    }
+    .selected {
+        background-color: #4CAF50;
+        color: white;
+    }
+    button {
+        margin: 5px;
+        padding: 8px;
+        font-size: 14px;
+    }
+</style>
+</head>
+<body>
+
+<h2>Select Your Available Times</h2>
+<p>Click as many time slots as you want.</p>
+
+<button onclick="downloadICS()">Download Calendar File (.ics)</button>
+<button onclick="emailMe()">Email File to Organizer</button>
+
+<br><br>
+
+<table id="availabilityTable"></table>
+
+<script>
+const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const table = document.getElementById("availabilityTable");
+
+function generateTimes() {
+    let times = [];
+    for (let h = 0; h < 24; h++) {
+        for (let m = 0; m < 60; m += 30) {
+            let hour = h.toString().padStart(2,'0');
+            let minute = m.toString().padStart(2,'0');
+            times.push(`${hour}:${minute}`);
+        }
+    }
+    return times;
+}
+
+function buildTable() {
+    let times = generateTimes();
+
+    let header = "<tr><th>Time</th>";
+    days.forEach(day => header += `<th>${day}</th>`);
+    header += "</tr>";
+    table.innerHTML += header;
+
+    times.forEach(time => {
+        let row = `<tr><td>${time}</td>`;
+        days.forEach(day => {
+            row += `<td onclick="toggle(this)" data-day="${day}" data-time="${time}"></td>`;
+        });
+        row += "</tr>";
+        table.innerHTML += row;
+    });
+}
+
+function toggle(cell) {
+    cell.classList.toggle("selected");
+}
+
+function getSelectedSlots() {
+    return document.querySelectorAll(".selected");
+}
+
+function generateICS() {
+    let selected = getSelectedSlots();
+    if (selected.length === 0) {
+        alert("No time slots selected.");
+        return null;
+    }
+
+    let ics = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Availability Picker//EN
+`;
+
+    selected.forEach(cell => {
+        let day = cell.dataset.day;
+        let time = cell.dataset.time;
+
+        // Use next upcoming week
+        let today = new Date();
+        let dayIndex = days.indexOf(day);
+        let diff = (dayIndex - today.getDay() + 7) % 7;
+        let eventDate = new Date(today);
+        eventDate.setDate(today.getDate() + diff);
+
+        let [hour, minute] = time.split(":");
+
+        let start = new Date(eventDate);
+        start.setHours(hour, minute, 0);
+
+        let end = new Date(start);
+        end.setMinutes(end.getMinutes() + 30);
+
+        function formatDate(d) {
+            return d.toISOString().replace(/[-:]/g,"").split(".")[0] + "Z";
+        }
+
+        ics += `BEGIN:VEVENT
+SUMMARY:Available
+DTSTART:${formatDate(start)}
+DTEND:${formatDate(end)}
+END:VEVENT
+`;
+    });
+
+    ics += "END:VCALENDAR";
+    return ics;
+}
+
+function downloadICS() {
+    let ics = generateICS();
+    if (!ics) return;
+
+    let blob = new Blob([ics], { type: "text/calendar" });
+    let link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "availability.ics";
+    link.click();
+}
+
+function emailMe() {
+    let subject = encodeURIComponent("My Availability");
+    let body = encodeURIComponent("Hi,\n\nI attached my availability calendar file.\n\nThanks!");
+    window.location.href = `mailto:ingMartinez761@gmail.com?subject=${subject}&body=${body}`;
+}
+
+buildTable();
+</script>
+
+</body>
+</html>
